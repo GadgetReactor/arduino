@@ -1,0 +1,68 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
+
+const char* ssid = "SSID";
+const char* password = "SSID-PASSWORD";
+String serverName = "http://<SERVER-NAME>/api/services/switch/";
+String authBearer = "ABCDEFG";
+String entity = "switch.test";
+const int button = 5;
+
+int state = LOW;      // the current state of the output pin
+int lastButtonState;    // the previous state of button
+int currentButtonState; // the current state of button
+
+void setup() {
+    Serial.begin(9600); 
+    pinMode(button, INPUT_PULLUP);
+    WiFi.begin(ssid, password);
+    Serial.println("Connecting");
+    while(WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("");
+    Serial.print("Connected to WiFi network with IP Address: ");
+    Serial.println(WiFi.localIP()); 
+}
+
+void loop() {
+    lastButtonState    = currentButtonState;  // save the last state
+    currentButtonState = digitalRead(button); // read new state
+  
+    if(lastButtonState == HIGH && currentButtonState == LOW) {
+        Serial.println("The button is pressed");
+        // toggle state of LED
+        state = !state;
+
+        if(WiFi.status()== WL_CONNECTED){
+            WiFiClient client;
+            HTTPClient http;
+            String serverPath = serverName;
+            if (state) {
+                serverPath += "turn_on";
+            } else {
+                serverPath += "turn_off";
+            }
+      
+            http.begin(client, serverPath.c_str());
+            http.addHeader("Authorization", "Bearer " + authBearer);
+            http.addHeader("Content-Type", "application/json");
+            int httpResponseCode = http.POST("{\"entity_id\": \""+entity+"\"}");
+      
+            if (httpResponseCode>0) {
+                Serial.print("HTTP Response code: ");
+                Serial.println(httpResponseCode);
+            }  else {
+                Serial.print("Error code: ");
+                Serial.println(httpResponseCode);
+            }
+            // Free resources
+            http.end();
+        } else {
+            Serial.println("WiFi Disconnected");
+        }
+    }
+    delay(200);   
+}
